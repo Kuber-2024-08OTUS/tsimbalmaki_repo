@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: homework-deployment
+  namespace: homework
+  labels:
+    env: prod
+spec:
+  replicas: 3
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      env: prod
+  template:
+    metadata:
+      labels:
+        env: prod
+    spec:
+      initContainers:
+      - name: init-container
+        image: busybox
+        command: ["sh", "-c", "echo 'hello world' > /homework/index.html"]
+        volumeMounts:
+        - name: shared-volume
+          mountPath: /homework
+      containers:
+      - name: main-container
+        image: busybox
+        command: ["/bin/sh", "-c", "while true; do sleep 1; done"]
+        ports:
+        - containerPort: 8000
+        readinessProbe:
+          exec:
+            command: ["/bin/sh", "-c", "[ -f /homework/index.html ] && exit 0 || exit 1"]
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        volumeMounts:
+        - name: shared-volume
+          mountPath: /homework
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "rm -f /homework/index.html"]
+      volumes:
+      - name: shared-volume
+        emptyDir: {}
